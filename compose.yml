@@ -1,0 +1,200 @@
+services:
+  broker:
+    image: redis:7-alpine
+    container_name: paperless-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  db:
+    image: postgres:17
+    container_name: paperless-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  paperless-web:
+    image: paperless-web:2.20.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PAPERLESS_ROLE: web
+    container_name: paperless-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    ports:
+      - "8008:8000"
+    environment:
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBPORT: 5432
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: paperless
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:-change-me-to-a-long-random-string}
+      PAPERLESS_URL: ${PAPERLESS_URL:-http://localhost:8008}
+      PAPERLESS_TIME_ZONE: ${PAPERLESS_TIME_ZONE:-UTC}
+      USERMAP_UID: ${USERMAP_UID:-1000}
+      USERMAP_GID: ${USERMAP_GID:-1000}
+      PAPERLESS_TASK_WORKERS: 0
+      PAPERLESS_THREADS_PER_WORKER: 0
+      PAPERLESS_WEBSERVER_WORKERS: ${PAPERLESS_WEBSERVER_WORKERS:-2}
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./consume:/usr/src/paperless/consume
+      - ./export:/usr/src/paperless/export
+      - paperless_tmp:/tmp/paperless
+    mem_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+  paperless-worker:
+    image: paperless-worker:2.20.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PAPERLESS_ROLE: worker
+    container_name: paperless-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    environment:
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBPORT: 5432
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: paperless
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:-change-me-to-a-long-random-string}
+      PAPERLESS_URL: ${PAPERLESS_URL:-http://localhost:8008}
+      PAPERLESS_TIME_ZONE: ${PAPERLESS_TIME_ZONE:-UTC}
+      USERMAP_UID: ${USERMAP_UID:-1000}
+      USERMAP_GID: ${USERMAP_GID:-1000}
+      PAPERLESS_TASK_WORKERS: 1
+      PAPERLESS_THREADS_PER_WORKER: ${PAPERLESS_THREADS_PER_WORKER:-2}
+      PAPERLESS_CONSUMER_DISABLE: true
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./consume:/usr/src/paperless/consume
+      - ./export:/usr/src/paperless/export
+      - paperless_tmp:/tmp/paperless
+    mem_limit: 1g
+    cpus: 4.0
+
+  paperless-consumer:
+    image: paperless-consumer:2.20.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PAPERLESS_ROLE: consumer
+    container_name: paperless-consumer
+    restart: unless-stopped
+    depends_on:
+      paperless-web:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    environment:
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBPORT: 5432
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: paperless
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:-change-me-to-a-long-random-string}
+      PAPERLESS_URL: ${PAPERLESS_URL:-http://localhost:8008}
+      PAPERLESS_TIME_ZONE: ${PAPERLESS_TIME_ZONE:-UTC}
+      USERMAP_UID: ${USERMAP_UID:-1000}
+      USERMAP_GID: ${USERMAP_GID:-1000}
+      PAPERLESS_TASK_WORKERS: 0
+      PAPERLESS_THREADS_PER_WORKER: 0
+      PAPERLESS_CONSUMER_DISABLE: false
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./consume:/usr/src/paperless/consume
+      - ./export:/usr/src/paperless/export
+      - paperless_tmp:/tmp/paperless
+    mem_limit: 1g
+    cpus: 1.0
+
+  paperless-scheduler:
+    image: paperless-scheduler:2.20.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PAPERLESS_ROLE: scheduler
+    container_name: paperless-scheduler
+    restart: unless-stopped
+    depends_on:
+      paperless-web:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    environment:
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBPORT: 5432
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: paperless
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:-change-me-to-a-long-random-string}
+      PAPERLESS_URL: ${PAPERLESS_URL:-http://localhost:8008}
+      PAPERLESS_TIME_ZONE: ${PAPERLESS_TIME_ZONE:-UTC}
+      USERMAP_UID: ${USERMAP_UID:-1000}
+      USERMAP_GID: ${USERMAP_GID:-1000}
+      PAPERLESS_TASK_WORKERS: 0
+      PAPERLESS_THREADS_PER_WORKER: 0
+      PAPERLESS_CONSUMER_DISABLE: true
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./consume:/usr/src/paperless/consume
+      - ./export:/usr/src/paperless/export
+      - paperless_tmp:/tmp/paperless
+    mem_limit: 512m
+    cpus: 0.5
+
+volumes:
+  pgdata:
+  redisdata:
+  data:
+  media:
+  paperless_tmp:
