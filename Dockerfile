@@ -83,6 +83,73 @@ RUN set -eux \
 # Copy our service defs and filesystem
 COPY ./docker/rootfs /
 
+# Build role-specific images with only the services and shared init steps they need.
+ARG PAPERLESS_ROLE=all
+RUN set -eux \
+  && case "${PAPERLESS_ROLE}" in \
+    all) ;; \
+    web) \
+      rm --recursive --force \
+        /etc/s6-overlay/s6-rc.d/svc-worker \
+        /etc/s6-overlay/s6-rc.d/svc-consumer \
+        /etc/s6-overlay/s6-rc.d/svc-scheduler \
+        /etc/s6-overlay/s6-rc.d/svc-flower \
+        /etc/s6-overlay/s6-rc.d/user/contents.d/svc-worker \
+        /etc/s6-overlay/s6-rc.d/user/contents.d/svc-consumer \
+        /etc/s6-overlay/s6-rc.d/user/contents.d/svc-scheduler \
+        /etc/s6-overlay/s6-rc.d/user/contents.d/svc-flower \
+        /etc/s6-overlay/s6-rc.d/svc-webserver/dependencies.d/svc-worker \
+        /etc/s6-overlay/s6-rc.d/svc-webserver/dependencies.d/svc-consumer \
+        /etc/s6-overlay/s6-rc.d/svc-webserver/dependencies.d/svc-scheduler \
+        /etc/s6-overlay/s6-rc.d/svc-webserver/dependencies.d/svc-flower \
+      ;; \
+    worker|consumer|scheduler) \
+      rm --recursive --force \
+        /etc/s6-overlay/s6-rc.d/svc-webserver \
+        /etc/s6-overlay/s6-rc.d/svc-flower \
+        /etc/s6-overlay/s6-rc.d/user/contents.d/svc-webserver \
+        /etc/s6-overlay/s6-rc.d/user/contents.d/svc-flower \
+        /etc/s6-overlay/s6-rc.d/init-migrations \
+        /etc/s6-overlay/s6-rc.d/init-search-index \
+        /etc/s6-overlay/s6-rc.d/init-superuser \
+        /etc/s6-overlay/s6-rc.d/init-complete/dependencies.d/init-migrations \
+        /etc/s6-overlay/s6-rc.d/init-complete/dependencies.d/init-search-index \
+        /etc/s6-overlay/s6-rc.d/init-complete/dependencies.d/init-superuser \
+        /etc/s6-overlay/s6-rc.d/init-system-checks/dependencies.d/init-superuser \
+        /etc/s6-overlay/s6-rc.d/init-custom-init/dependencies.d/init-search-index \
+      && case "${PAPERLESS_ROLE}" in \
+        worker) \
+          rm --recursive --force \
+            /etc/s6-overlay/s6-rc.d/svc-consumer \
+            /etc/s6-overlay/s6-rc.d/svc-scheduler \
+            /etc/s6-overlay/s6-rc.d/user/contents.d/svc-consumer \
+            /etc/s6-overlay/s6-rc.d/user/contents.d/svc-scheduler \
+          ;; \
+        consumer) \
+          rm --recursive --force \
+            /etc/s6-overlay/s6-rc.d/svc-worker \
+            /etc/s6-overlay/s6-rc.d/svc-scheduler \
+            /etc/s6-overlay/s6-rc.d/user/contents.d/svc-worker \
+            /etc/s6-overlay/s6-rc.d/user/contents.d/svc-scheduler \
+          ;; \
+        scheduler) \
+          rm --recursive --force \
+            /etc/s6-overlay/s6-rc.d/svc-worker \
+            /etc/s6-overlay/s6-rc.d/svc-consumer \
+            /etc/s6-overlay/s6-rc.d/user/contents.d/svc-worker \
+            /etc/s6-overlay/s6-rc.d/user/contents.d/svc-consumer \
+          ;; \
+      esac \
+      ;; \
+    *) \
+      echo "Unsupported PAPERLESS_ROLE: ${PAPERLESS_ROLE}" >&2 \
+      exit 1 \
+      ;; \
+  esac \
+  && if [ "${PAPERLESS_ROLE}" != "all" ]; then \
+    echo "Building Paperless role: ${PAPERLESS_ROLE}"; \
+  fi
+
 # Stage: main-app
 # Purpose: The final image
 # Comments:
