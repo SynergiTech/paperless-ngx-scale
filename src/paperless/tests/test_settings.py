@@ -70,6 +70,9 @@ class TestIgnoreDateParsing(TestCase):
 
 
 class TestThreadCalculation(TestCase):
+    def test_zero_workers(self):
+        self.assertEqual(default_threads_per_worker(0), 1)
+
     def test_workers_threads(self):
         """
         GIVEN:

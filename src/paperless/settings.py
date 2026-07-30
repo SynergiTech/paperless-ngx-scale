@@ -988,6 +988,8 @@ CACHES = _parse_caches()
 def default_threads_per_worker(task_workers) -> int:
     # always leave one core open
     available_cores = max(multiprocessing.cpu_count(), 1)
+    if task_workers <= 0:
+        return 1
     try:
         return max(math.floor(available_cores / task_workers), 1)
     except NotImplementedError:
