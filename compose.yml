@@ -81,7 +81,6 @@ services:
       dockerfile: Dockerfile
       args:
         PAPERLESS_ROLE: worker
-    container_name: paperless-worker
     restart: unless-stopped
     depends_on:
       db:
