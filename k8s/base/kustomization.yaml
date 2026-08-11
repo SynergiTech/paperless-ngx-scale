@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: paperless
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret-generator.yaml
+  - pvc.yaml
+  - postgres.yaml
+  - redis.yaml
+  - paperless-services.yaml
+  - paperless-deployments.yaml
+
+images:
+  - name: paperless-web
+    newTag: 2.20.1
+  - name: paperless-worker
+    newTag: 2.20.1
+  - name: paperless-consumer
+    newTag: 2.20.1
+  - name: paperless-scheduler
+    newTag: 2.20.1
