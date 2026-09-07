@@ -212,7 +212,6 @@ class Document(SoftDeleteModel, ModelWithOwner):
         _("checksum"),
         max_length=32,
         editable=False,
-        unique=True,
         help_text=_("The checksum of the original document."),
     )
 
@@ -317,6 +316,10 @@ class Document(SoftDeleteModel, ModelWithOwner):
         ordering = ("-created",)
         verbose_name = _("document")
         verbose_name_plural = _("documents")
+        indexes = [
+            models.Index(fields=("owner", "checksum")),
+            models.Index(fields=("owner", "archive_checksum")),
+        ]
 
     def __str__(self) -> str:
         created = self.created.isoformat()

@@ -499,6 +499,38 @@ class TestConsumer(
         with self.get_consumer(self.get_test_file()) as consumer:
             consumer.run()
 
+    def testDuplicatesAreScopedToOwner(self):
+        user1 = User.objects.create(username="user1")
+        user2 = User.objects.create(username="user2")
+
+        with self.get_consumer(
+            self.get_test_file(),
+            DocumentMetadataOverrides(owner_id=user1.pk),
+        ) as consumer:
+            consumer.run()
+
+        with self.assertRaisesMessage(ConsumerError, "It is a duplicate"):
+            with self.get_consumer(
+                self.get_test_file(),
+                DocumentMetadataOverrides(owner_id=user1.pk),
+            ) as consumer:
+                consumer.run()
+
+        with self.get_consumer(
+            self.get_test_file(),
+            DocumentMetadataOverrides(owner_id=user2.pk),
+        ) as consumer:
+            consumer.run()
+
+        with self.assertRaisesMessage(ConsumerError, "It is a duplicate"):
+            with self.get_consumer(
+                self.get_test_file(),
+                DocumentMetadataOverrides(owner_id=user2.pk),
+            ) as consumer:
+                consumer.run()
+
+        self.assertEqual(Document.objects.filter(checksum__isnull=False).count(), 2)
+
     def testDuplicateInTrash(self):
         with self.get_consumer(self.get_test_file()) as consumer:
             consumer.run()

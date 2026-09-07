@@ -784,6 +784,8 @@ class ConsumerPreflightPlugin(
         existing_doc = Document.global_objects.filter(
             Q(checksum=checksum) | Q(archive_checksum=checksum),
         )
+        if self.metadata.owner_id is not None:
+            existing_doc = existing_doc.filter(owner_id=self.metadata.owner_id)
         if existing_doc.exists():
             msg = ConsumerStatusShortMessage.DOCUMENT_ALREADY_EXISTS
             log_msg = f"Not consuming {self.filename}: It is a duplicate of {existing_doc.get().title} (#{existing_doc.get().pk})."
