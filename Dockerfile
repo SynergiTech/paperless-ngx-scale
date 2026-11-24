@@ -196,7 +196,7 @@ ARG RUNTIME_PACKAGES="\
   # fonts for text file thumbnail generation
   fonts-liberation \
   gettext \
-  ghostscript \
+  ghostscript=10.05.1~dfsg-1+deb13u3 \
   gnupg \
   icc-profiles-free \
   imagemagick \
